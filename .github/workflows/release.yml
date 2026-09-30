@@ -61,7 +61,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release download "$RELEASE_TAG" --pattern shape-kit.zip --dir build/weights
+          # 草稿 Release 不参与 gh release download，改经 gh release view 取资产地址后下载。
+          mkdir -p build/weights
+          asset_url="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[] | select(.name == "shape-kit.zip") | .apiUrl')"
+          test -n "$asset_url" || { echo '未找到 shape-kit.zip 资产'; exit 1; }
+          curl -fsSL -H "Authorization: token $GH_TOKEN" -H "Accept: application/octet-stream" -o build/weights/shape-kit.zip "$asset_url"
           python scripts/fetch_kit.py --archive build/weights/shape-kit.zip
       - name: 单元回归测试
         run: python -m pytest tests -q --basetemp build/pytest
