@@ -61,11 +61,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          # 草稿 Release 不参与 gh release download，改经 gh release view 取资产地址后下载。
-          mkdir -p build/weights
-          asset_url="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[] | select(.name == "shape-kit.zip") | .apiUrl')"
-          test -n "$asset_url" || { echo '未找到 shape-kit.zip 资产'; exit 1; }
-          curl -fsSL -H "Authorization: token $GH_TOKEN" -H "Accept: application/octet-stream" -o build/weights/shape-kit.zip "$asset_url"
+          gh release download "$RELEASE_TAG" --pattern shape-kit.zip --dir build/weights
           python scripts/fetch_kit.py --archive build/weights/shape-kit.zip
       - name: 单元回归测试
         run: python -m pytest tests -q --basetemp build/pytest
@@ -103,7 +99,7 @@ jobs:
 
   attach:
     needs: build
-    # 当前原生依赖材料尚未齐全；只有已完成分发核查的标签才允许写入 Release。
+    # 只有已完成原生依赖分发核查的标签才允许写入 Release。
     if: vars.NATIVE_DISTRIBUTION_APPROVED_TAG == inputs.tag
     runs-on: ubuntu-24.04
     permissions:
@@ -119,10 +115,9 @@ jobs:
           pattern: package-*
           merge-multiple: true
           path: packages
-      - name: 仅向草稿添加通过验收的安装包
+      - name: 向 Release 添加通过验收的安装包
         shell: bash
         run: |
-          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
           gh release upload "$RELEASE_TAG" packages/*
           if [ "$PUBLISH" = true ]; then
             gh release edit "$RELEASE_TAG" --draft=false --prerelease
