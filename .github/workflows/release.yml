@@ -123,3 +123,4 @@ jobs:
           if [ "$PUBLISH" = true ]; then
             gh release edit "$RELEASE_TAG" --draft=false --prerelease
           fi
+
