@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>本地模型检索 · Local Model Search</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/standalone-bridge.js"></script>
+  <script type="module" src="/static/app.js"></script>
+</head>
+<body>
+  <header class="page-header">
+    <div><h1>本地模型检索<span class="local-badge"><i></i>仅在本机处理</span></h1><p>让已有设计，成为下一次创作的起点。</p></div>
+    <div><button id="import-legacy" class="quiet">导入旧检索库</button><button id="settings" class="quiet">配置与日志</button></div>
+  </header>
+  <div id="connection" class="notice" role="status">正在连接本地检索服务…</div>
+  <nav class="tabs" aria-label="检索功能"><button id="tab-search" class="active" aria-selected="true">模型检索</button><button id="tab-libraries" aria-selected="false">本地库管理 <span id="library-count">0</span></button></nav>
+  <main>
+    <section id="search-page">
+      <div class="search-layout">
+        <aside class="query-panel panel">
+          <div class="section-heading"><h2>查询模型</h2><span class="subtle">01</span></div>
+          <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="选择或拖入查询模型">
+            <svg width="54" height="54" viewBox="0 0 54 54" fill="none" aria-hidden="true"><path d="M27 5 46 16v22L27 49 8 38V16L27 5Z" stroke="currentColor" stroke-width="1.6"/><path d="m8 16 19 11 19-11M27 27v22M18 11l19 11" stroke="currentColor" stroke-width="1.4"/></svg>
+            <strong>拖入模型，发现相似设计</strong><span>或点击选择本地文件</span><small>STEP / STL / OBJ / 3MF 等 · 最大 256 MB</small>
+          </div>
+          <input id="file-input" type="file" accept=".step,.stp,.stl,.obj,.ply,.glb,.gltf,.3mf,.off" hidden>
+          <div id="query-model" hidden>
+            <div class="viewer-wrap"><div id="query-viewer" class="viewer"></div><span class="viewer-tag">查询模型</span><button id="reset-query" class="viewer-reset" title="复位视角">复位视角</button></div>
+            <div class="file-line"><strong id="query-name"></strong><button id="replace-file" class="text-button">更换</button></div>
+            <p class="viewer-help">左键旋转 · 滚轮缩放 · 右键平移</p>
+          </div>
+          <div class="field"><label for="keywords">限定检索范围 <span>可选</span></label><input id="keywords" placeholder="模型名称、类别或库名"><small>多个关键词以空格分隔，取交集</small></div>
+          <div class="field"><div class="label-line"><label>检索库</label><button id="select-all" class="text-button">全选</button></div><div id="library-options" class="library-options"><span class="subtle">尚未建立检索库</span></div></div>
+          <div class="field inline"><label for="topk">结果数量</label><select id="topk"><option value="5">Top 5</option><option value="10" selected>Top 10</option><option value="20">Top 20</option><option value="50">Top 50</option></select></div>
+          <button id="search" class="primary full" disabled>查找相似模型 <span>→</span></button>
+          <p class="privacy-note">模型与特征保留在本机，不上传云端。</p>
+        </aside>
+        <section class="results-panel">
+          <div class="section-heading result-heading"><div><h2 id="results-title">相似设计</h2><p id="results-subtitle">选择模型后，按几何特征查找可复用的设计</p></div><span id="result-count" class="count-badge" hidden></span></div>
+          <div id="results-empty" class="empty-state"><div class="empty-symbol">⌕</div><h3>先检索，再设计</h3><p>添加本地模型库，上传一个参考模型，<br>快速找到形状相近的已有零件。</p><button id="empty-create" class="secondary">建立第一个检索库</button><div class="steps"><span>01 建立本地库</span><b>→</b><span>02 选择参考模型</span><b>→</b><span>03 对比与复用</span></div></div>
+          <div id="results" class="result-grid"></div>
+        </section>
+      </div>
+    </section>
+    <section id="libraries-page" hidden>
+      <div class="section-heading"><div><h2>你的设计资产</h2><p>从本地文件夹建立检索索引。原始文件保持不变。</p></div><button id="new-library" class="primary">＋ 新建检索库</button></div>
+      <div id="library-list" class="library-list"></div>
+      <div id="libraries-empty" class="empty-state panel"><div class="empty-symbol">▦</div><h3>把分散的设计，整理成可检索的资产</h3><p>选择一个模型文件夹，系统将自动提取特征并建立本地索引。</p><button id="first-library" class="primary">选择文件夹建库</button></div>
+      <section id="library-browser" class="panel library-browser" hidden><div class="section-heading"><h2 id="browse-title">库内模型</h2><button id="close-browser" class="quiet">收起</button></div><div id="browse-models" class="result-grid"></div><button id="browse-more" class="secondary" hidden>加载更多</button></section>
+    </section>
+    <section id="task-panel" class="task-panel panel" hidden aria-live="polite"><div class="task-header"><div><span id="task-kind" class="task-kind">任务</span><strong id="task-title"></strong></div><button id="cancel-task" class="text-button">取消任务</button><button id="dismiss-task" class="text-button" hidden>收起</button></div><div class="progress-track"><div id="task-progress"></div></div><div class="task-info"><span id="task-message"></span><span id="task-count"></span></div><details id="task-errors" hidden><summary>查看处理失败的文件</summary><pre id="task-error-text"></pre></details><button id="retry-task" class="secondary" hidden>重试</button></section>
+  </main>
+  <dialog id="create-dialog"><form id="create-form"><div class="dialog-heading"><h2>新建本地检索库</h2><button type="button" class="close-dialog quiet" aria-label="关闭">×</button></div><p>选择已有模型文件夹，原始文件不会被移动或修改。</p><div class="field"><label for="library-name">检索库名称</label><input id="library-name" maxlength="80" required placeholder="例如：结构件 / 项目设计归档"></div><div class="field"><label>模型目录</label><div class="folder-select"><span id="folder-path">未选择文件夹</span><button type="button" id="choose-folder" class="secondary">选择文件夹</button></div><small>自动扫描子文件夹，按首级目录归类</small></div><div class="dialog-note">首次建库需要提取模型特征，耗时取决于文件数量与硬件。后续刷新将复用已有缓存。</div><div class="dialog-actions"><button type="button" class="close-dialog secondary">取消</button><button id="create-submit" class="primary" type="submit">开始建立索引</button></div></form></dialog>
+  <dialog id="detail-dialog" class="detail-dialog"><div class="dialog-heading"><div><div class="eyebrow">MODEL COMPARISON</div><h2 id="detail-name"></h2></div><button class="close-dialog quiet" aria-label="关闭">×</button></div><div class="detail-layout"><div class="comparison"><div id="compare-query-slot" hidden></div><div><div class="viewer-wrap"><div id="detail-viewer" class="viewer"></div><span class="viewer-tag">候选模型</span><button id="reset-detail" class="viewer-reset">复位视角</button></div><p class="viewer-help">左键旋转 · 滚轮缩放 · 右键平移</p></div></div><aside><span class="subtle">余弦相似度</span><div id="detail-score" class="score-large">—</div><dl id="detail-meta"></dl><p class="dialog-note">相似度用于候选排序，不代表模型相同，也不是重复设计概率。</p><button id="detail-edit" class="primary full">在 CAD 中打开编辑</button><div id="detail-edit-options" class="edit-options" hidden><button type="button" class="edit-option" data-mode="copy"><strong>创建副本并编辑<em>推荐</em></strong><span>复制一份到原文件夹后打开，原模型保留在库中，适合在其基础上衍生新版本</span></button><button type="button" class="edit-option" data-mode="direct"><strong>直接编辑原文件</strong><span>打开库中的原始文件，修改保存会覆盖原模型</span></button></div><div id="detail-program-options" class="edit-options" hidden></div><button id="detail-similar" class="primary full">以此模型继续检索</button><button id="detail-reveal" class="secondary full">打开所在文件夹</button></aside></div></dialog>
+  <dialog id="confirm-dialog"><div class="dialog-heading"><h2>移除检索库？</h2></div><p id="confirm-text"></p><p class="dialog-note">只移除索引与预览缓存，不会删除原始设计文件。</p><div class="dialog-actions"><button id="confirm-no" class="secondary">保留</button><button id="confirm-yes" class="danger">移除检索库</button></div></dialog>
+  <div id="toast" role="alert" hidden></div>
+</body>
+</html>

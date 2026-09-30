@@ -1,0 +1,11 @@
+Flask>=3.0,<4
+numpy>=1.24
+scipy>=1.10
+trimesh>=4.6
+torch>=2.6
+einops>=0.6
+lxml>=5.0
+Pillow>=10
+PyYAML>=6.0.2,<7
+cadquery-ocp-novtk>=7.8
+pywebview>=5.0

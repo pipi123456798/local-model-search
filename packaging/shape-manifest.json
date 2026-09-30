@@ -1,0 +1,15 @@
+{
+  "source_repository": "https://github.com/simd-ai/shape",
+  "source_revision": "4f632ca4b283ec28de98c1434598ddd5d21c8cbb",
+  "license": "Apache-2.0",
+  "license_git_blob": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+  "model_repository": "https://huggingface.co/bayang/shape-foundation-small-v3",
+  "model_card": "https://huggingface.co/bayang/shape-foundation-small-v3/raw/main/README.md",
+  "model_card_mirror_verified": "https://hf-mirror.com/bayang/shape-foundation-small-v3/raw/main/README.md",
+  "checkpoint": "checkpoint_final.pt",
+  "checkpoint_bytes": 125852616,
+  "checkpoint_sha256": "a7f4ebd478f972312a1e4b4e9c510c6592fcc91f0901d6c1ebe1cb68bb6c6d53",
+  "verification_date": "2026-09-30",
+  "attribution": "Shape Foundation Model, Notelink LLC / simd-ai; model published by bayang.",
+  "scope": "仅分发推理代码和权重，不包含训练数据、预计算数据集嵌入或用户模型。"
+}

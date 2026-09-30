@@ -1,0 +1,125 @@
+name: 构建独立检索安装包
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '已有源码标签及草稿 Release（例如 v1.1.0，需先上传 shape-kit.zip）'
+        required: true
+        default: v1.1.0
+      publish_prerelease:
+        description: '两平台通过验收后公开为预发布版本（Mac GUI 尚需实机验收）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: 核对标签与目标架构
+        shell: bash
+        run: |
+          python -c "import os,re,platform; assert re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+',os.environ['RELEASE_TAG']); assert (platform.system(),platform.machine().lower()) in [('Windows','amd64'),('Darwin','arm64')]"
+      - name: 创建独立构建环境
+        shell: bash
+        run: |
+          python -m venv build/venv
+          python -c "import os,pathlib; p=pathlib.Path('build/venv')/('Scripts' if os.name=='nt' else 'bin'); print(p.resolve())" >> "$GITHUB_PATH"
+      - name: 安装 CPU 推理环境
+        if: runner.os == 'Windows'
+        run: python -m pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
+      - name: 安装构建依赖
+        run: python -m pip install -r packaging/requirements-build.txt
+      - name: 校验并准备固定版本安装器编译器
+        if: runner.os == 'Windows'
+        run: python packaging/prepare_inno.py
+      - name: 下载固定标签的权重并校验
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release download "$RELEASE_TAG" --pattern shape-kit.zip --dir build/weights
+          python scripts/fetch_kit.py --archive build/weights/shape-kit.zip
+      - name: 单元回归测试
+        run: python -m pytest tests -q --basetemp build/pytest
+      - name: 原生打包和产物级离线验收
+        shell: bash
+        run: python packaging/build_app.py --version "${RELEASE_TAG#v}"
+      - name: Windows 安装与数据保留验收
+        if: runner.os == 'Windows'
+        shell: bash
+        run: python packaging/test_windows_install.py --installer "dist/LocalModelSearch-${RELEASE_TAG#v}-Windows-x64-Setup.exe"
+      - name: 保存平台安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.os }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            dist/LocalModelSearch-*.exe
+            dist/LocalModelSearch-*.zip
+            dist/LocalModelSearch-*.dmg
+            dist/SHA256SUMS-*.txt
+      - name: 保存验收记录
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checks-${{ matrix.os }}
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            build/smoke-*.json
+            build/smoke-user/startup.log
+            build/dependency-versions.json
+            build/安装验收 */installation-report.json
+            build/安装验收 */installed-smoke.json
+
+  attach:
+    needs: build
+    # 当前原生依赖材料尚未齐全；只有已完成分发核查的标签才允许写入 Release。
+    if: vars.NATIVE_DISTRIBUTION_APPROVED_TAG == inputs.tag
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      PUBLISH: ${{ inputs.publish_prerelease }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          merge-multiple: true
+          path: packages
+      - name: 仅向草稿添加通过验收的安装包
+        shell: bash
+        run: |
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
+          gh release upload "$RELEASE_TAG" packages/*
+          if [ "$PUBLISH" = true ]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease
+          fi
